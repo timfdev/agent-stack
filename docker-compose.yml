@@ -22,20 +22,12 @@ services:
     env_file:
       - .env
     volumes:
-      # Persistent agent state — restic backs this up nightly.
-      - ./data/agent-zero/memory:/a0/memory
-      - ./data/agent-zero/knowledge:/a0/knowledge
-      - ./data/agent-zero/work_dir:/a0/work_dir
-      - ./data/agent-zero/scheduler:/a0/tmp/scheduler
-      # a0-discord plugin state (member registry, channel config).
-      - ./data/agent-zero/plugins/discord:/a0/usr/plugins/discord/data
-      # Skills mounted read-only — the agent only reads skill files.
-      - ./agent-zero/skills:/a0/knowledge/custom/skills:ro
-      # Plugin source mounted writable so docker can create the nested
-      # ./data mountpoint at runtime (the plugin source has no data/
-      # subdir, and a read-only parent blocks mountpoint creation). The
-      # plugin audit confirmed it does not modify its own source tree.
-      - ./agent-zero/plugins/discord:/a0/usr/plugins/discord
+      # Single volume per Agent Zero's docs (`-v a0_usr:/a0/usr`). All
+      # user state (memory, knowledge, scheduler, plugins) lives here
+      # post-migration. The a0-discord plugin is installed via
+      # `docker cp` after the container is up, per the plugin's README —
+      # not bind-mounted, because that fights the migration system.
+      - ./data/agent-zero/usr:/a0/usr
 
   mcp-gateway:
     image: ${MCP_GATEWAY_IMAGE}
@@ -46,14 +38,25 @@ services:
     volumes:
       # Docker socket — the gateway lazy-spawns MCP server containers.
       - /var/run/docker.sock:/var/run/docker.sock
-      # Custom catalog of MCP servers (LinkedIn for v0).
+      # Catalog of MCP servers, version-controlled in this repo.
       - ./mcp-config:/mcp-config:ro
-      # Shared cache root for MCP server containers (e.g. LinkedIn session).
-      - ./data/linkedin-mcp:/data/linkedin-mcp
-    # Catalog file path is passed at runtime; see README for the
-    # `docker mcp catalog`/`docker mcp server enable` workflow that
-    # registers ./mcp-config/custom.yaml into the gateway's profile.
-    command: ["--catalog", "/mcp-config/custom.yaml"]
+      # Shared cache root for stateful MCP server containers (e.g.
+      # browser-based scrapers' login sessions).
+      - ./data/mcp-cache:/data/mcp-cache
+    command:
+      - --catalog
+      - /mcp-config/custom.yaml
+      # HTTP transport so the gateway runs as a long-lived service that
+      # Agent Zero connects to. Defaulting to stdio (one-shot) made the
+      # service exit cleanly on every start.
+      - --transport
+      - streaming
+      - --port
+      - "8811"
+      # No --servers flag: the gateway runs idle until a server is
+      # enabled (add `--servers name1,name2` here, or use `docker mcp
+      # server enable <name>` from the host). The catalog declares what
+      # exists; --servers (or enable) decides what's active.
 
 networks:
   agent-net:

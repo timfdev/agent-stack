@@ -74,30 +74,24 @@ docker exec agent-zero supervisorctl restart run_ui
 The plugin reads `DISCORD_BOT_TOKEN` directly from the container env
 (set by compose from `.env`); no wrapper needed.
 
-### 4. Register the LinkedIn MCP server with the gateway
+### 4. Register MCP servers with the gateway
 
 ```bash
 docker mcp catalog import ./mcp-config/custom.yaml
-docker mcp server enable linkedin
+docker mcp server enable <name>           # for each server in custom.yaml
 ```
 
-This is a one-time registration into the gateway's profile DB. The
-gateway will lazy-spawn the LinkedIn container on first tool call.
+One-time registration into the gateway's profile DB. The gateway then
+lazy-spawns each MCP server container on first tool call. Adding a new
+tool later = append an entry to `custom.yaml` + run `docker mcp server
+enable <name>`; no compose changes.
 
-### 5. First-time LinkedIn login (manual, ~once per quarter)
+Some MCP servers need their own first-time setup before the agent can
+use them (e.g. interactive login for browser-based scrapers, OAuth flow
+for API-based ones). Those steps live in each server's own
+documentation — keep notes in `mcp-config/` if you need a runbook.
 
-The Patchright session lives in `data/linkedin-mcp/cache/`. Easiest path:
-
-```bash
-docker run --rm -it \
-  -v "$PWD/data/linkedin-mcp/cache:/home/pwuser/.linkedin-mcp" \
-  stickerdaniel/linkedin-mcp-server:4.12.0 --login
-```
-
-Follow the prompts, complete the LinkedIn login in the headed browser.
-The session persists in the mounted cache directory.
-
-### 6. Bring up the stack
+### 5. Bring up the stack
 
 ```bash
 docker compose up -d
@@ -117,7 +111,7 @@ permissions in the NordVPN app so only devices that need it have
 (SSH-forward fallback if you prefer to bind to 127.0.0.1 instead:
 `ssh -L 50001:127.0.0.1:50001 <meshnet-name>`.)
 
-### 7. Bootstrap the v0 skill
+### 6. Bootstrap the v0 skill
 
 Pick `gpt-4o-mini` as the model in Agent Zero's Settings on first run
 (the OPENAI_API_KEY is already in the container env, so it just shows
@@ -138,7 +132,7 @@ memory under `data/agent-zero/`.
 |---|---|
 | Always | Docker Desktop running, Meshnet up |
 | On boot | `docker compose up -d` (compose `restart: unless-stopped` covers most cases) |
-| Per quarter | Re-run step 5 (LinkedIn re-login) |
+| Per MCP-server quirks | Re-do any per-server first-time setup if a session expires (see that server's docs) |
 | Per month | Glance at `#audit`, test-restore from restic |
 | Per key rotation | Edit `.env`, `docker compose restart agent-zero` |
 | Per new tool | Add entry to `mcp-config/custom.yaml`, `docker mcp server enable <name>` |
