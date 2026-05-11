@@ -15,7 +15,7 @@ servers:
       # populates this directory — see README "First-time LinkedIn login".
       - ./data/linkedin-mcp/cache:/home/pwuser/.linkedin-mcp
     environment:
-      TZ: ${TZ}
+      TZ: Europe/Amsterdam
       TOOL_TIMEOUT: "180"
     disabled_tools:
       - connect_with_person

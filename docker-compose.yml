@@ -14,7 +14,7 @@ services:
       # ACLs are the access gate; set a UI password in Agent Zero too.
       - "${AGENT_ZERO_BIND}:50001:80"
     environment:
-      TZ: ${TZ}
+      TZ: Europe/Amsterdam
       # Secrets are surfaced as files under /run/secrets — a0-discord reads
       # DISCORD_BOT_TOKEN, so we expand the secret at startup via the wrapper.
       ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic-key
