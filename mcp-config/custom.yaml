@@ -18,9 +18,10 @@ registry:
     type: server
     image: stickerdaniel/linkedin-mcp-server:4.12.0
     description: >
-      LinkedIn scraping via Patchright. Read-only by convention — write
-      tools (connect_with_person, send_message) should be excluded
-      from the gateway's --tools whitelist.
+      LinkedIn scraping via Patchright. The gateway's --tools flag in
+      docker-compose.yml whitelists the read-only tools plus the
+      local-only close_session; connect_with_person and send_message
+      (the only LinkedIn-visible writes) are excluded.
     # Browser session is stateful; keep the container running between
     # tool calls so the Patchright login persists.
     longLived: true

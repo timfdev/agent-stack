@@ -99,6 +99,16 @@ services:
       # we want.
       - --servers
       - linkedin
+      # Tool whitelist. The gateway has no "exclude destructive" flag
+      # even though every tool advertises destructiveHint / readOnlyHint
+      # in its MCP annotations, so we list the LinkedIn tools we want
+      # explicitly. Excluded on purpose: connect_with_person and
+      # send_message — the only LinkedIn-visible write actions.
+      # close_session is included: it only kills the in-memory browser
+      # (persisted profile in linkedin-mcp-cache survives), so it's a
+      # useful resource-release hook, not a destructive action.
+      - --tools
+      - close_session,get_company_posts,get_company_profile,get_conversation,get_feed,get_inbox,get_job_details,get_person_profile,get_sidebar_profiles,search_conversations,search_jobs,search_people
 
 networks:
   agent-net:
