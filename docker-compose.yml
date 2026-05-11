@@ -77,10 +77,13 @@ services:
       - streaming
       - --port
       - "8811"
-      # No --servers flag: the gateway runs idle until a server is
-      # enabled (add `--servers name1,name2` here, or use `docker mcp
-      # server enable <name>` from the host). The catalog declares what
-      # exists; --servers (or enable) decides what's active.
+      # Enable specific catalog servers here (comma-separated).
+      # `--servers` bypasses the `docker mcp profile …` CLI dance, which
+      # has thrashed its syntax across versions. Edit this list when
+      # adding/removing tools; restart only this service to apply:
+      #   docker compose up -d mcp-gateway
+      - --servers
+      - linkedin
 
 networks:
   agent-net:

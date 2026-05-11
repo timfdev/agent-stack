@@ -46,20 +46,37 @@ Why .env and not Docker secrets: neither Agent Zero nor a0-discord read
 the `_FILE` indirection convention, so the secrets/ ceremony would have
 been ornamental. `chmod 600 .env` is the same threat model on this host.
 
-### 3. Register MCP servers with the gateway
+### 3. Enable MCP servers
 
-Host-side CLI; doesn't need the stack up. The `docker mcp` CLI ships
-with Docker Desktop.
+Defined servers live in `mcp-config/custom.yaml` (the gateway's
+catalog). Each one is activated by listing it under the gateway's
+`--servers` flag in `docker-compose.yml`:
 
-```bash
-docker mcp catalog import ./mcp-config/custom.yaml
-docker mcp server enable <name>           # for each server in custom.yaml
+```yaml
+mcp-gateway:
+  command:
+    - --catalog
+    - /mcp-config/custom.yaml
+    - --servers
+    - linkedin,github,...
 ```
 
-One-time registration into the gateway's profile DB. The gateway then
-lazy-spawns each MCP server container on first tool call. Adding a new
-tool later = append an entry to `custom.yaml` + run `docker mcp server
-enable <name>`; no compose changes.
+The gateway lazy-spawns each enabled MCP server container on first
+tool call. To add/remove tools: edit the comma-separated `--servers`
+list, then:
+
+```bash
+docker compose up -d mcp-gateway
+```
+
+agent-zero keeps running; its MCP client reconnects within a few
+seconds and the tool list refreshes.
+
+(The `docker mcp` CLI has profile/catalog management, but the
+`catalog import` verb that used to ingest local YAMLs has been
+removed; the current CLI is built around OCI-registry-distributed
+catalogs. For a single-host setup with a local YAML, the compose
+`--servers` flag is the surviving clean path.)
 
 Some MCP servers need their own first-time setup before the agent can
 use them (e.g. interactive login for browser-based scrapers, OAuth flow
