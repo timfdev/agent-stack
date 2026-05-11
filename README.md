@@ -13,8 +13,7 @@ this file is the operator's runbook.
 - **Tracked (this repo):** `docker-compose.yml`, `.env.example`,
   `mcp-config/`, `agent-zero/skills/`, this README.
 - **Gitignored (local on the Mac mini):** `.env` (real credentials + config),
-  `data/` (memory, scheduler.db, LinkedIn session cache), the cloned
-  `agent-zero/plugins/discord/` source.
+  `data/` (memory, scheduler.db, plugin runtime state, MCP session caches).
 
 Disaster recovery is therefore `git clone + restic restore + docker compose up -d`.
 
@@ -47,34 +46,10 @@ Why .env and not Docker secrets: neither Agent Zero nor a0-discord read
 the `_FILE` indirection convention, so the secrets/ ceremony would have
 been ornamental. `chmod 600 .env` is the same threat model on this host.
 
-### 3. Clone the a0-discord plugin source
+### 3. Register MCP servers with the gateway
 
-The plugin source is third-party and not tracked here — clone it into the
-gitignored path and pin to a known commit:
-
-```bash
-git clone https://github.com/spinnakergit/a0-discord.git agent-zero/plugins/discord
-cd agent-zero/plugins/discord
-git checkout <PIN_THIS_COMMIT>   # write the hash you tested into this README
-cd ../../..
-```
-
-Compose mounts `agent-zero/plugins/discord` read-only into the container
-at `/a0/usr/plugins/discord`. On first start, run the plugin's one-time
-initialize step inside the container:
-
-```bash
-docker compose up -d agent-zero
-docker exec agent-zero ln -sf /a0/usr/plugins/discord /a0/plugins/discord
-docker exec agent-zero python /a0/usr/plugins/discord/initialize.py
-docker exec agent-zero touch /a0/usr/plugins/discord/.toggle-1
-docker exec agent-zero supervisorctl restart run_ui
-```
-
-The plugin reads `DISCORD_BOT_TOKEN` directly from the container env
-(set by compose from `.env`); no wrapper needed.
-
-### 4. Register MCP servers with the gateway
+Host-side CLI; doesn't need the stack up. The `docker mcp` CLI ships
+with Docker Desktop.
 
 ```bash
 docker mcp catalog import ./mcp-config/custom.yaml
@@ -91,7 +66,7 @@ use them (e.g. interactive login for browser-based scrapers, OAuth flow
 for API-based ones). Those steps live in each server's own
 documentation — keep notes in `mcp-config/` if you need a runbook.
 
-### 5. Bring up the stack
+### 4. Bring up the stack
 
 ```bash
 docker compose up -d
@@ -110,6 +85,14 @@ permissions in the NordVPN app so only devices that need it have
 
 (SSH-forward fallback if you prefer to bind to 127.0.0.1 instead:
 `ssh -L 50001:127.0.0.1:50001 <meshnet-name>`.)
+
+### 5. Install the Discord plugin via Agent Zero's UI
+
+Open the UI, find the Discord plugin in the community plugin list,
+install + enable it from there, and configure channel routing +
+`auto_start` in its plugin settings page. The plugin reads
+`DISCORD_BOT_TOKEN` from the container env (set by compose from `.env`);
+no wrapper needed.
 
 ### 6. Bootstrap the v0 skill
 

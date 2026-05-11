@@ -3,9 +3,6 @@
 # Local runtime state (memory, scheduler.db, LinkedIn session cache, ...)
 data/
 
-# Third-party plugin source (cloned at setup, pinned commit in README)
-agent-zero/plugins/discord/
-
 # macOS cruft
 .DS_Store
 

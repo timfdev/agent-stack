@@ -28,6 +28,30 @@ services:
       # `docker cp` after the container is up, per the plugin's README —
       # not bind-mounted, because that fights the migration system.
       - ./data/agent-zero/usr:/a0/usr
+    healthcheck:
+      # discord-init waits for this to go green before running.
+      test: ["CMD-SHELL", "curl -fs http://localhost/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  discord-init:
+    # One-shot: after agent-zero is healthy, register Discord channels
+    # listed in .env with the chat bridge. Idempotent; safe to re-run.
+    # Skips silently if the plugin isn't installed yet (first boot
+    # before UI install).
+    image: docker:cli
+    depends_on:
+      agent-zero:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts:/scripts:ro
+    env_file:
+      - .env
+    entrypoint: ["/scripts/register-channels.sh"]
+    restart: "no"
 
   mcp-gateway:
     image: ${MCP_GATEWAY_IMAGE}
