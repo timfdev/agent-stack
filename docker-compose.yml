@@ -12,7 +12,7 @@ services:
       # Bound to AGENT_ZERO_BIND — set to the Mac mini's Meshnet IP so any
       # linked Meshnet device reaches the UI directly. Meshnet's per-peer
       # ACLs are the access gate; set a UI password in Agent Zero too.
-      - "${AGENT_ZERO_BIND}:${AGENT_ZERO_PORT}:80"
+      - "${AGENT_ZERO_BIND}:50001:80"
     environment:
       TZ: ${TZ}
       # Secrets are surfaced as files under /run/secrets — a0-discord reads
