@@ -36,7 +36,9 @@ git clone git@github.com:<agent-account>/agent-stack.git .
 ```bash
 cp .env.example .env
 # Fill in DISCORD_CHANNEL_* IDs after creating the Discord server.
-# Confirm AGENT_ZERO_BIND — 127.0.0.1 + SSH-forward is the safe default.
+# Set AGENT_ZERO_BIND to the Mac mini's Meshnet IP (run `nordvpn meshnet
+# peer list` or check the NordVPN app). Meshnet's per-peer ACLs are the
+# access control — set a UI password in Agent Zero on first run.
 ```
 
 ### 3. Populate `secrets/`
@@ -103,13 +105,18 @@ docker compose up -d
 docker compose logs -f agent-zero
 ```
 
-Reach the web UI by SSH-forwarding over Meshnet:
+Reach the web UI directly over Meshnet from any linked device:
 
-```bash
-# from operator's laptop
-ssh -L 50001:127.0.0.1:50001 <meshnet-name>
-# then open http://127.0.0.1:50001
 ```
+http://<mac-mini-meshnet-ip>:50001
+```
+
+Set an Agent Zero UI password on first login. Tighten Meshnet per-peer
+permissions in the NordVPN app so only devices that need it have
+"Allow incoming traffic" enabled.
+
+(SSH-forward fallback if you prefer to bind to 127.0.0.1 instead:
+`ssh -L 50001:127.0.0.1:50001 <meshnet-name>`.)
 
 ### 8. Bootstrap the v0 skill
 
