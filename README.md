@@ -83,6 +83,34 @@ use them (e.g. interactive login for browser-based scrapers, OAuth flow
 for API-based ones). Those steps live in each server's own
 documentation — keep notes in `mcp-config/` if you need a runbook.
 
+#### LinkedIn — Patchright session (one-time)
+
+The linkedin-mcp-server drives a real Chromium browser inside the
+container, but Docker has no display server, so the login itself must
+happen on the host (per the upstream README). The compose file binds
+the container's `~/.linkedin-mcp` to the host's `~/.linkedin-mcp`, so
+whatever you log in to on the host is what the agent sees.
+
+On the Mac mini's GUI session (Screen Share into it if remote):
+
+```bash
+# Install uv if not present
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Open a browser, log in to LinkedIn manually (5-min timeout for 2FA /
+# captcha / mobile-app confirm)
+uvx linkedin-scraper-mcp@latest --login
+```
+
+Cookies + profile persist under `~/.linkedin-mcp/`. Sessions can
+expire — rerun `--login` on the host to refresh; no container
+restart needed.
+
+If you want to bring the stack up *before* logging in (to set up the
+UI, install Discord, etc.), just `mkdir -p ~/.linkedin-mcp` so the
+bind mount has a source. LinkedIn tool calls will fail with a
+"not logged in" error until you complete `--login`.
+
 ### 4. Bring up the stack
 
 ```bash

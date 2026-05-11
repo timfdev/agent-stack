@@ -53,25 +53,10 @@ services:
     entrypoint: ["/scripts/register-channels.sh"]
     restart: "no"
 
-  linkedin-cache-init:
-    # One-shot: chown the linkedin-mcp-cache named volume to UID 1000
-    # (pwuser inside the linkedin image) so its first write doesn't
-    # hit EACCES. Idempotent; runs on every `compose up` but the chown
-    # is a no-op after the first time. Without this, the linkedin MCP
-    # server crashes on startup with PermissionError on its trace dir.
-    image: alpine:latest
-    volumes:
-      - linkedin-mcp-cache:/data
-    command: ["chown", "-R", "1000:1000", "/data"]
-    restart: "no"
-
   mcp-gateway:
     image: ${MCP_GATEWAY_IMAGE}
     container_name: mcp-gateway
     restart: unless-stopped
-    depends_on:
-      linkedin-cache-init:
-        condition: service_completed_successfully
     networks:
       - agent-net
     volumes:
@@ -82,6 +67,14 @@ services:
       # Shared cache root for stateful MCP server containers (e.g.
       # browser-based scrapers' login sessions).
       - ./data/mcp-cache:/data/mcp-cache
+      # The gateway itself doesn't read the linkedin cache — this mount
+      # exists so compose actually CREATES the bind-backed
+      # `linkedin-mcp-cache` named volume on `compose up`. Without a
+      # service reference, compose skips materializing it, and the
+      # gateway's docker-run of the linkedin container would then
+      # silently auto-create a vanilla-driver volume by the same name,
+      # bypassing our ${HOME}/.linkedin-mcp bind.
+      - linkedin-mcp-cache:/mnt/linkedin-mcp-cache:ro
     command:
       - --catalog
       - /mcp-config/custom.yaml
@@ -115,11 +108,25 @@ networks:
     driver: bridge
 
 volumes:
-  # Persistent Patchright session for the linkedin MCP server, referenced
-  # from mcp-config/custom.yaml. Named volume avoids the
-  # daemon-CWD-relative path issue with catalog bind-mount entries.
-  # `name:` pin overrides compose's default project-prefixing —
-  # mcp-config/custom.yaml references the *unprefixed* name, so both
-  # the init chown and the gateway's docker-run target the same volume.
+  # Persistent Patchright session for the linkedin MCP server.
+  # Named (not project-prefixed) so mcp-config/custom.yaml's catalog
+  # entry can reference it as `linkedin-mcp-cache` and resolve to the
+  # same volume the compose project owns.
+  #
+  # Bind-backed: actual storage is the host's ~/.linkedin-mcp dir, which
+  # is where `uvx linkedin-scraper-mcp@latest --login` writes the
+  # browser profile + cookies (see README "LinkedIn — Patchright
+  # session" for the one-time host login step). Bind keeps host
+  # `uvx --login` and the container's view in sync — re-logging in on
+  # the host refreshes the session without touching containers.
+  #
+  # Pre-req: `~/.linkedin-mcp` must exist before `compose up`
+  # (bind mounts can't auto-create their source). `uvx --login`
+  # creates it; if you haven't logged in yet, `mkdir -p ~/.linkedin-mcp`.
   linkedin-mcp-cache:
     name: linkedin-mcp-cache
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.linkedin-mcp
