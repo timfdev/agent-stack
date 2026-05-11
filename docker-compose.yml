@@ -15,15 +15,12 @@ services:
       - "${AGENT_ZERO_BIND}:50001:80"
     environment:
       TZ: Europe/Amsterdam
-      # Credentials — read from .env (chmod 600, gitignored). Agent Zero
-      # and a0-discord both read plain env vars; neither supports the
-      # Docker `_FILE` convention.
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
-      # Discord channel routing — consumed by the a0-discord plugin config.
-      DISCORD_CHANNEL_GENERAL: ${DISCORD_CHANNEL_GENERAL}
-      DISCORD_CHANNEL_LEADS: ${DISCORD_CHANNEL_LEADS}
-      DISCORD_CHANNEL_AUDIT: ${DISCORD_CHANNEL_AUDIT}
+    # Everything in .env is passed through to the container (chmod 600,
+    # gitignored). This auto-includes any future A0_SET_* model pins so
+    # we don't have to mirror each new variable into compose. Compose-
+    # interpolation variables (AGENT_ZERO_BIND, image tags) stay above.
+    env_file:
+      - .env
     volumes:
       # Persistent agent state — restic backs this up nightly.
       - ./data/agent-zero/memory:/a0/memory
