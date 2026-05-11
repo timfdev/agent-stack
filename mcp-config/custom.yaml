@@ -1,0 +1,22 @@
+# Custom MCP server catalog — registered into the gateway profile via:
+#   docker mcp catalog import ./mcp-config/custom.yaml
+#   docker mcp server enable linkedin
+#
+# Adding a tool = new entry here + enable command. No compose edit, no restart.
+
+servers:
+  linkedin:
+    image: stickerdaniel/linkedin-mcp-server:4.12.0
+    description: >
+      Read-only LinkedIn scraping via Patchright. Write tools disabled at the
+      gateway so the agent cannot send connection requests or DMs.
+    volumes:
+      # Persistent Patchright profile (logged-in session). One-time login
+      # populates this directory — see README "First-time LinkedIn login".
+      - ./data/linkedin-mcp/cache:/home/pwuser/.linkedin-mcp
+    environment:
+      TZ: ${TZ}
+      TOOL_TIMEOUT: "180"
+    disabled_tools:
+      - connect_with_person
+      - send_message
