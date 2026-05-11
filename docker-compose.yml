@@ -29,9 +29,13 @@ services:
       - ./data/agent-zero/scheduler:/a0/tmp/scheduler
       # a0-discord plugin state (member registry, channel config).
       - ./data/agent-zero/plugins/discord:/a0/usr/plugins/discord/data
-      # Skills and plugin source live in-repo, mounted read-only into the container.
+      # Skills mounted read-only — the agent only reads skill files.
       - ./agent-zero/skills:/a0/knowledge/custom/skills:ro
-      - ./agent-zero/plugins/discord:/a0/usr/plugins/discord:ro
+      # Plugin source mounted writable so docker can create the nested
+      # ./data mountpoint at runtime (the plugin source has no data/
+      # subdir, and a read-only parent blocks mountpoint creation). The
+      # plugin audit confirmed it does not modify its own source tree.
+      - ./agent-zero/plugins/discord:/a0/usr/plugins/discord
 
   mcp-gateway:
     image: ${MCP_GATEWAY_IMAGE}
