@@ -11,9 +11,9 @@ this file is the operator's runbook.
 ## What's tracked here vs. what's local
 
 - **Tracked (this repo):** `docker-compose.yml`, `.env.example`,
-  `mcp-config/`, `agent-zero/skills/`, `scripts/`, this README.
-- **Gitignored (local on the Mac mini):** `secrets/` (real keys), `data/`
-  (memory, scheduler.db, LinkedIn session cache), `.env`, the cloned
+  `mcp-config/`, `agent-zero/skills/`, this README.
+- **Gitignored (local on the Mac mini):** `.env` (real credentials + config),
+  `data/` (memory, scheduler.db, LinkedIn session cache), the cloned
   `agent-zero/plugins/discord/` source.
 
 Disaster recovery is therefore `git clone + restic restore + docker compose up -d`.
@@ -35,18 +35,19 @@ git clone git@github.com:<agent-account>/agent-stack.git .
 
 ```bash
 cp .env.example .env
-# Fill in DISCORD_CHANNEL_* IDs after creating the Discord server.
-# Set AGENT_ZERO_BIND to the Mac mini's Meshnet IP (run `nordvpn meshnet
-# peer list` or check the NordVPN app). Meshnet's per-peer ACLs are the
-# access control — set a UI password in Agent Zero on first run.
+chmod 600 .env
+# Fill in:
+#   OPENAI_API_KEY              — set a low monthly $ cap on it
+#   DISCORD_BOT_TOKEN           — bot account token
+#   DISCORD_CHANNEL_*           — channel IDs after creating the server
+#   AGENT_ZERO_BIND             — Mac mini's Meshnet IP
 ```
 
-### 3. Populate `secrets/`
+Why .env and not Docker secrets: neither Agent Zero nor a0-discord read
+the `_FILE` indirection convention, so the secrets/ ceremony would have
+been ornamental. `chmod 600 .env` is the same threat model on this host.
 
-See [`secrets/README.md`](secrets/README.md). Both files must be
-`chmod 600`.
-
-### 4. Clone the a0-discord plugin source
+### 3. Clone the a0-discord plugin source
 
 The plugin source is third-party and not tracked here — clone it into the
 gitignored path and pin to a known commit:
@@ -70,12 +71,10 @@ docker exec agent-zero touch /a0/usr/plugins/discord/.toggle-1
 docker exec agent-zero supervisorctl restart run_ui
 ```
 
-The plugin reads `DISCORD_BOT_TOKEN` from the env (compose passes the
-secret file path; if the plugin doesn't support `_FILE` indirection
-directly, the simplest fix is `export DISCORD_BOT_TOKEN=$(cat /run/secrets/discord-az-token)`
-in the plugin's startup wrapper — verify on first run).
+The plugin reads `DISCORD_BOT_TOKEN` directly from the container env
+(set by compose from `.env`); no wrapper needed.
 
-### 5. Register the LinkedIn MCP server with the gateway
+### 4. Register the LinkedIn MCP server with the gateway
 
 ```bash
 docker mcp catalog import ./mcp-config/custom.yaml
@@ -85,7 +84,7 @@ docker mcp server enable linkedin
 This is a one-time registration into the gateway's profile DB. The
 gateway will lazy-spawn the LinkedIn container on first tool call.
 
-### 6. First-time LinkedIn login (manual, ~once per quarter)
+### 5. First-time LinkedIn login (manual, ~once per quarter)
 
 The Patchright session lives in `data/linkedin-mcp/cache/`. Easiest path:
 
@@ -98,7 +97,7 @@ docker run --rm -it \
 Follow the prompts, complete the LinkedIn login in the headed browser.
 The session persists in the mounted cache directory.
 
-### 7. Bring up the stack
+### 6. Bring up the stack
 
 ```bash
 docker compose up -d
@@ -118,7 +117,11 @@ permissions in the NordVPN app so only devices that need it have
 (SSH-forward fallback if you prefer to bind to 127.0.0.1 instead:
 `ssh -L 50001:127.0.0.1:50001 <meshnet-name>`.)
 
-### 8. Bootstrap the v0 skill
+### 7. Bootstrap the v0 skill
+
+Pick `gpt-4o-mini` as the model in Agent Zero's Settings on first run
+(the OPENAI_API_KEY is already in the container env, so it just shows
+up as a valid provider). Then:
 
 In Discord `#general`, ask Agent Zero to:
 
@@ -135,19 +138,10 @@ memory under `data/agent-zero/`.
 |---|---|
 | Always | Docker Desktop running, Meshnet up |
 | On boot | `docker compose up -d` (compose `restart: unless-stopped` covers most cases) |
-| Per quarter | Re-run step 6 (LinkedIn re-login) |
+| Per quarter | Re-run step 5 (LinkedIn re-login) |
 | Per month | Glance at `#audit`, test-restore from restic |
-| Per key rotation | Replace file in `secrets/`, `docker compose restart agent-zero` |
+| Per key rotation | Edit `.env`, `docker compose restart agent-zero` |
 | Per new tool | Add entry to `mcp-config/custom.yaml`, `docker mcp server enable <name>` |
-
-## Kill switch
-
-```bash
-./scripts/panic.sh
-```
-
-Stops the stack, moves the Discord token aside, and prints the manual
-follow-ups (revoke Discord token in dev portal, rotate Anthropic key).
 
 ## Notes on image pins
 

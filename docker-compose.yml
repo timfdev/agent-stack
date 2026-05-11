@@ -15,10 +15,11 @@ services:
       - "${AGENT_ZERO_BIND}:50001:80"
     environment:
       TZ: Europe/Amsterdam
-      # Secrets are surfaced as files under /run/secrets — a0-discord reads
-      # DISCORD_BOT_TOKEN, so we expand the secret at startup via the wrapper.
-      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic-key
-      DISCORD_BOT_TOKEN_FILE: /run/secrets/discord-az-token
+      # Credentials — read from .env (chmod 600, gitignored). Agent Zero
+      # and a0-discord both read plain env vars; neither supports the
+      # Docker `_FILE` convention.
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       # Discord channel routing — consumed by the a0-discord plugin config.
       DISCORD_CHANNEL_GENERAL: ${DISCORD_CHANNEL_GENERAL}
       DISCORD_CHANNEL_LEADS: ${DISCORD_CHANNEL_LEADS}
@@ -34,9 +35,6 @@ services:
       # Skills and plugin source live in-repo, mounted read-only into the container.
       - ./agent-zero/skills:/a0/knowledge/custom/skills:ro
       - ./agent-zero/plugins/discord:/a0/usr/plugins/discord:ro
-    secrets:
-      - anthropic-key
-      - discord-az-token
 
   mcp-gateway:
     image: ${MCP_GATEWAY_IMAGE}
@@ -59,9 +57,3 @@ services:
 networks:
   agent-net:
     driver: bridge
-
-secrets:
-  anthropic-key:
-    file: ./secrets/anthropic-key
-  discord-az-token:
-    file: ./secrets/discord-az-token

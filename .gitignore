@@ -1,10 +1,5 @@
 # --- Project-specific: agent-stack ---
 
-# Secrets and state — never commit
-secrets/*
-!secrets/README.md
-!secrets/.gitkeep
-
 # Local runtime state (memory, scheduler.db, LinkedIn session cache, ...)
 data/
 
