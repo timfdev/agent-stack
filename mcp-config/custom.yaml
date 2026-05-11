@@ -1,22 +1,42 @@
-# Custom MCP server catalog — registered into the gateway profile via:
-#   docker mcp catalog import ./mcp-config/custom.yaml
-#   docker mcp server enable linkedin
+# Docker MCP gateway catalog. Schema source:
+#   docker/mcp-gateway pkg/catalog/types.go  (struct `topLevel` + `Server`)
 #
-# Adding a tool = new entry here + enable command. No compose edit, no restart.
+# Each server is keyed under `registry:` (NOT `servers:` — that was the
+# old / wrong shape and silently produced 0 tools). Required per-server
+# fields: name, type (one of: server | remote | poci), image (for
+# `type: server`).
+#
+# Tool filtering happens at the gateway via `--tools <list>` (whitelist),
+# not via a `disabled_tools` field on the catalog entry.
 
-servers:
+name: agent-stack
+displayName: agent-stack local catalog
+
+registry:
   linkedin:
+    name: linkedin
+    type: server
     image: stickerdaniel/linkedin-mcp-server:4.12.0
     description: >
-      Read-only LinkedIn scraping via Patchright. Write tools disabled at the
-      gateway so the agent cannot send connection requests or DMs.
+      LinkedIn scraping via Patchright. Read-only by convention — write
+      tools (connect_with_person, send_message) should be excluded
+      from the gateway's --tools whitelist.
+    # Browser session is stateful; keep the container running between
+    # tool calls so the Patchright login persists.
+    longLived: true
+    env:
+      - name: TZ
+        value: Europe/Amsterdam
+      - name: TOOL_TIMEOUT
+        value: "180"
     volumes:
-      # Persistent Patchright profile (logged-in session). One-time login
-      # populates this directory — see README "First-time LinkedIn login".
-      - ./data/linkedin-mcp/cache:/home/pwuser/.linkedin-mcp
-    environment:
-      TZ: Europe/Amsterdam
-      TOOL_TIMEOUT: "180"
-    disabled_tools:
-      - connect_with_person
-      - send_message
+      # Named docker volume so:
+      #   1) the path doesn't resolve against the docker daemon's CWD
+      #      (relative paths in catalog volumes go to filesystem root, not
+      #      our project dir — discovered the hard way)
+      #   2) the volume root is chown'd to pwuser on first write, so no
+      #      UID-mismatch permission errors.
+      # One-time interactive login populates this volume; subsequent tool
+      # calls reuse it. To back up via restic, snapshot the volume's
+      # mount inside the gateway: see README.
+      - linkedin-mcp-cache:/home/pwuser/.linkedin-mcp

@@ -53,10 +53,25 @@ services:
     entrypoint: ["/scripts/register-channels.sh"]
     restart: "no"
 
+  linkedin-cache-init:
+    # One-shot: chown the linkedin-mcp-cache named volume to UID 1000
+    # (pwuser inside the linkedin image) so its first write doesn't
+    # hit EACCES. Idempotent; runs on every `compose up` but the chown
+    # is a no-op after the first time. Without this, the linkedin MCP
+    # server crashes on startup with PermissionError on its trace dir.
+    image: alpine:latest
+    volumes:
+      - linkedin-mcp-cache:/data
+    command: ["chown", "-R", "1000:1000", "/data"]
+    restart: "no"
+
   mcp-gateway:
     image: ${MCP_GATEWAY_IMAGE}
     container_name: mcp-gateway
     restart: unless-stopped
+    depends_on:
+      linkedin-cache-init:
+        condition: service_completed_successfully
     networks:
       - agent-net
     volumes:
@@ -71,20 +86,30 @@ services:
       - --catalog
       - /mcp-config/custom.yaml
       # HTTP transport so the gateway runs as a long-lived service that
-      # Agent Zero connects to. Defaulting to stdio (one-shot) made the
-      # service exit cleanly on every start.
+      # Agent Zero connects to.
       - --transport
       - streaming
       - --port
       - "8811"
-      # Enable specific catalog servers here (comma-separated).
-      # `--servers` bypasses the `docker mcp profile …` CLI dance, which
-      # has thrashed its syntax across versions. Edit this list when
-      # adding/removing tools; restart only this service to apply:
-      #   docker compose up -d mcp-gateway
+      # Enable specific catalog servers here. In default (non-static)
+      # mode the gateway docker-runs each server's image directly via
+      # the mounted docker socket (clientpool.go:482 — NewStdioCmdClient
+      # with "docker" as the command). With --static it would instead
+      # expect sibling containers at mcp-<name>:4444 — that's NOT what
+      # we want.
       - --servers
       - linkedin
 
 networks:
   agent-net:
     driver: bridge
+
+volumes:
+  # Persistent Patchright session for the linkedin MCP server, referenced
+  # from mcp-config/custom.yaml. Named volume avoids the
+  # daemon-CWD-relative path issue with catalog bind-mount entries.
+  # `name:` pin overrides compose's default project-prefixing —
+  # mcp-config/custom.yaml references the *unprefixed* name, so both
+  # the init chown and the gateway's docker-run target the same volume.
+  linkedin-mcp-cache:
+    name: linkedin-mcp-cache
